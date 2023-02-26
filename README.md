@@ -30,7 +30,7 @@ Note that the "-v" argument here is optional and will generate plots visualizing
 
 SharedSight works by taking in search queries and returning responses, but it will also ask you to do your research and check its work. Users can note whether they believe a given search result they see is misinformation, and by analyzing the ratio between reported queries and normal queries SharedSight ensures dynamic misinformation detection. 
 
-**Note that SharedSight does not delete suspected misinformation, rather it displays that information in its own column along with sources on why this information is suspicious. Truth is variable, and SharedSight attempts to model this in its search process.**
+**Note that SharedSight does not delete suspected misinformation, rather it displays that information in its own column along with sources on why this information is suspicious. Information is variable, and SharedSight attempts to model this in its search process as it identifies misinformation.**
 
 Search Result Visualization:
 ![](img/search_results.png)
