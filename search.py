@@ -60,18 +60,17 @@ if __name__ == "__main__":
         good_sentences = sentences[~misinf]
         for i in range(len(good_sentences)):
             print(f"Response {i+1}: ========================================================================")
-            print(f"Response: {good_sentences[i]}")
+            print(f"Article Info: {good_sentences[i]}")
             print(f"Category: {categories[~misinf][i]}")
             print(f"URL: {urls[~misinf][i]}")
             print("=========================================================================================\n")
         good_idx = idx[~misinf]
-        new_bad_string = input("Input the Responses that don't seem to be correct as a Comma Separated List: ")
+        new_bad_string = input("Input the responses that don't seem to be correct as a comma separated list: ")
         if new_bad_string != "":
             new_bads = [int(s) - 1 for s in new_bad_string.split(',') if int(s) > 0 and int(s) <= len(good_sentences)]
             new_bad_idxs = idx[~misinf][new_bads]
             data['misinf_ratio'][new_bad_idxs] = (data['misinf_ratio'][new_bad_idxs] * data['n_queries'][new_bad_idxs] + 1) / (data['n_queries'][new_bad_idxs] + 1)
             data['n_queries'][new_bad_idxs] += 1
-            print(data['misinf_ratio'][new_bad_idxs])
         
         misinf_sentences = sentences[misinf]
         if len(misinf_sentences) != 0:
@@ -82,8 +81,8 @@ if __name__ == "__main__":
             support_samples = np.concatenate(support_samples)
             print("\n\nThe following queries returned potentially suspicious results:")
             for i in range(len(misinf_sentences)):
-                print("=========================================================================================")
-                print(f"Response: {misinf_sentences[i]}")
+                print(f"Suspicious Response {i+1}: =============================================================")
+                print(f"Article Info: {misinf_sentences[i]}")
                 print(f"Category: {categories[misinf][i]}")
                 print(f"URL: {urls[misinf][i]}")
                 print("=========================================================================================")
@@ -93,15 +92,17 @@ if __name__ == "__main__":
                 category = data['categories'][i]
                 url = data['urls'][i]
                 print("=========================================================================================")
-                print(f"Response: {sentence}")
+                print(f"Article Info: {sentence}")
                 print(f"Category: {category}")
                 print(f"URL: {url}")
                 print("=========================================================================================\n")
+
+            new_good_string = input("With the following info, input the suspicious responses that seem to credible as a comma separated list: ")
+            if new_good_string != "":
+                new_goods = [int(s) - 1 for s in new_good_string.split(',') if int(s) > 0 and int(s) <= len(misinf_sentences)]
+                new_good_idxs = idx[misinf][new_goods]
+                data['misinf_ratio'][new_good_idxs] = max(0, data['misinf_ratio'][new_good_idxs] * data['n_queries'][new_good_idxs] - 1) / (data['n_queries'][new_good_idxs] + 1)
+                data['n_queries'][new_good_idxs] += 1
+            
     save_query_data(data_path, data)
     print("Saved Data Sucessfully, Thank You!")
-
-
-
-
-     
-
