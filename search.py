@@ -90,8 +90,10 @@ if __name__ == "__main__":
             for e in good_disp_embeds:
                 x, y, z = np.concatenate((np.expand_dims(e, axis=0), np.expand_dims(query_disp_embed, axis=0))).T
                 ax.plot(x, y, z, color="green")
-                ax.scatter(x[0], y[0], z[0], color="green")
-                ax.scatter(x[1], y[1], z[1], color="blue")
+                ax.scatter(x[0], y[0], z[0], color="green", label="Result")
+                ax.scatter(x[1], y[1], z[1], color="blue", label="Query")
+            plt.legend()
+            plt.title("Search Result Visualization")
             plt.show()
 
         new_bad_string = input("Input the responses that don't seem to be correct as a comma separated list: ")
@@ -120,7 +122,7 @@ if __name__ == "__main__":
                     for e in good_disp_embeds:
                         x, y, z = np.concatenate((np.expand_dims(e, axis=0), np.expand_dims(doc_disp_embed, axis=0))).T
                         ax.plot(x, y, z, color="green")
-                        ax.scatter(x[0], y[0], z[0], color="green")
+                        ax.scatter(x[0], y[0], z[0], color="green", label="Support")
                         ax.scatter(x[1], y[1], z[1], color="red")
                 support_samples += [good_support_idx]
             if args.visualize:
@@ -129,8 +131,10 @@ if __name__ == "__main__":
                 for e in bad_disp_embeds:
                     x, y, z = np.concatenate((np.expand_dims(e, axis=0), np.expand_dims(query_disp_embed, axis=0))).T
                     ax.plot(x, y, z, color="red")
-                    ax.scatter(x[0], y[0], z[0], color="red")
-                    ax.scatter(x[1], y[1], z[1], color="red")
+                    ax.scatter(x[0], y[0], z[0], color="red", label="Suspicious")
+                    ax.scatter(x[1], y[1], z[1], color="blue", label="Query")
+                plt.legend()
+                plt.title("Misinformation Detection and Support")
                 plt.show()
             support_samples = np.concatenate(support_samples)
             print("\n\nThe following queries returned potentially suspicious results:")
