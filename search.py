@@ -53,6 +53,12 @@ def get_index_query_files(pattern: str = "search_*"):
     index_path, data_path = f"{pattern[:-1]}{max_version}.index", f"{pattern[:-1]}{max_version}.json"
     return index_path, data_path
 
+# Borrowed (stolen) from https://stackoverflow.com/a/56253636
+def legend_without_duplicate_labels(ax):
+    handles, labels = ax.get_legend_handles_labels()
+    unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
+    ax.legend(*zip(*unique))
+
 def parse_args():
     args = argparse.ArgumentParser()
     args.add_argument("-v", "--visualize", action="store_true", help="Determine whether to visualize the topic search system")
@@ -92,7 +98,7 @@ if __name__ == "__main__":
                 ax.plot(x, y, z, color="green")
                 ax.scatter(x[0], y[0], z[0], color="green", label="Result")
                 ax.scatter(x[1], y[1], z[1], color="blue", label="Query")
-            plt.legend()
+            legend_without_duplicate_labels(ax)
             plt.title("Search Result Visualization")
             plt.show()
 
@@ -133,7 +139,7 @@ if __name__ == "__main__":
                     ax.plot(x, y, z, color="red")
                     ax.scatter(x[0], y[0], z[0], color="red", label="Suspicious")
                     ax.scatter(x[1], y[1], z[1], color="blue", label="Query")
-                plt.legend()
+                legend_without_duplicate_labels(ax)
                 plt.title("Misinformation Detection and Support")
                 plt.show()
             support_samples = np.concatenate(support_samples)
