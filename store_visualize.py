@@ -82,6 +82,7 @@ if __name__ == "__main__":
         save_embeds(dataset_sentences, embeddings, categories, embed_file)
 
         query_data = {
+            "embed_file": embed_file,
             "sentences": dataset_sentences.tolist(), 
             "categories": categories.tolist(), 
             "urls": urls.tolist(), 
