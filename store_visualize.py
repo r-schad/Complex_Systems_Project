@@ -1,4 +1,5 @@
 import os
+import faiss
 import json
 import pickle
 
@@ -47,6 +48,11 @@ def balance_dataset_idx(categories: List[str], num_sentences: int) -> np.ndarray
 def get_category_idxs(categories: np.ndarray) -> Dict:
     unique_categories = list(set(categories))
     return {cat: (categories == cat).nonzero() for cat in unique_categories}
+
+def build_faiss_index(index_str: str, embeddings: np.ndarray):
+    index = faiss.index_factory(embeddings.shape[1], index_str)
+    index.add_with_ids(embeddings, np.arange(embeddings.shape[0]))
+    return index
 
 if __name__ == "__main__":
     embed_file = input("Input Embedding Filename: ")
@@ -106,3 +112,11 @@ if __name__ == "__main__":
         ax.scatter(x, y, z, label=category)
     plt.legend()
     plt.show()
+
+    index = build_faiss_index("HNSW64,IDMap", embeddings)
+    faiss.write_index(index, f"search_full.index")
+    query_str = input("Input Query String: ")
+    query_embed = encode_sentences(model, [query_str])
+    dist, idx = index.search(query_embed, k=5)
+    for i in idx:
+        print(dataset_sentences[i])
