@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 class Lattice_Network():
     def __init__(self, network_shape: Tuple, embedding_dimension: int, evap_factor: float, 
@@ -59,20 +59,25 @@ class Lattice_Network():
                     east = (row, col + 1)
                     self.neighbors[row][col].append(east)
     
-    def get_pheremone_vec(self, row: int, col: int) -> np.ndarray:
-        return self.pheremones[row][col]
+    def get_pheremone_vec(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> np.ndarray:
+        return self.pheremones[row, col]
 
     def get_centroid_pheremone_vec(self, row: int, col: int) -> np.ndarray:
-        # get max row and column of the pheremone map
-        r, c, _ = self.pheromones.shape
-        min_row, max_row = max(0, row - self.centroid_radius), min(r - 1, row + self.centroid_radius)
-        min_col, max_col = max(0, col - self.centroid_radius), min(c - 1, col + self.centroid_radius)
-        # extract all pheremones in the target region
-        region_pheremones = self.pheremones[min_row:max_row][min_col:max_col]
+        region_set = set()
+        outer_points = self.get_neighbors(row, col)
+        region_set.update(outer_points + [(row, col)])
+
+        for _ in range(self.centroid_radius):
+            np_outer = np.array(outer_points)
+            candidate_points = self.get_neighbors(*np_outer.T)
+            outer_points = [p for p in candidate_points if tuple(p) not in region_set]
+            region_set.update(outer_points)
+        region_points = np.array(list(region_set))
+        region_pheremones = self.get_pheremone_vec(*region_points.T)
         return np.mean(region_pheremones, axis=[0, 1])
-    
-    def get_neighbors(self, row: int, col: int) -> List[Tuple]:
-        return self.neighbors[row][col]
+   
+    def get_neighbors(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> Union[List[Tuple], np.ndarray]:
+        return self.neighbors[row, col]
 
     def evaporate_pheremones(self):
         self.pheremones -= self.evap_factor * self.init_pheremones

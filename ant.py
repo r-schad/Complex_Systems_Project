@@ -24,7 +24,7 @@ class Ant:
     # apply ant pheremone weighting
     def pheremone_weighting(self, sigma: float) -> float:
         # TODO: are we doing the ant path smoothing factor here? See equation (9) in Fernandes et al.
-        return 1 + ((self.delta / (1 + (sigma * self.delta))) ** self.beta)
+        return (1 + (self.delta / (1 + (sigma * self.delta)))) ** self.beta
 
     # compute the pheremone of the edge between two nodes (equation (10) in Fernandes et al.)
     def find_edge_pheremone(self, centroid_pheremone: np.ndarray, node_pheremone: np.ndarray) -> float:
