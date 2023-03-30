@@ -1,8 +1,9 @@
 import numpy as np
 
+from functools import reduce
 from typing import List, Tuple, Union
 
-class Lattice_Network():
+class LatticeNetwork():
     def __init__(self, network_shape: Tuple, embedding_dimension: int, evap_factor: float, 
                  centroid_radius: int = 1):
         # initialize centroid radius and evaporation factor
@@ -15,11 +16,11 @@ class Lattice_Network():
         if type(embedding_dimension) != int:
             raise ValueError('embedding_dimension should be an int')
 
-        # initialize pheromone vectors
-        unnormalized_pheromones = np.random.rand(network_shape[0], network_shape[1], embedding_dimension) 
-        # normalize each node's pheromone vector to an L2-norm of 1
-        self.pheromones = unnormalized_pheromones / np.linalg.norm(unnormalized_pheromones, axis=2, keepdims=True)
-        self.init_pheremones = np.copy(self.pheremones)
+        # initialize normally distributed pheromone vectors
+        unnormalized_pheromones = np.random.randn(network_shape[0], network_shape[1], embedding_dimension)
+        # normalize each node's pheromone vector to an L2-norm of 1 to project to spherical points
+        self.pheromones = unnormalized_pheromones / np.linalg.norm(unnormalized_pheromones, axis=-1, keepdims=True)
+        self.init_pheromones = np.copy(self.pheromones)
 
         # initialize 8-neighbor neighborhood adjacency list
         self.neighbors = np.ndarray(network_shape, dtype=list)
@@ -59,25 +60,38 @@ class Lattice_Network():
                     east = (row, col + 1)
                     self.neighbors[row][col].append(east)
     
-    def get_pheremone_vec(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> np.ndarray:
-        return self.pheremones[row, col]
+    def get_pheromone_vec(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> np.ndarray:
+        return self.pheromones[row, col]
 
-    def get_centroid_pheremone_vec(self, row: int, col: int) -> np.ndarray:
+    # TODO: do we want to enforce that the mean pheremone vectors are normalized?
+    # tentative argument for not normalizing, bc the norm of a vector is indicative of the "strength" of a given topic
+    # (eg. a "distracted" node will have a pheremone vector with a lower norm, which means even if it finds a match it's less likely to pick it)
+    # This will result in distracted nodes being less likely to be traversed, with specialized nodes being picked instead
+    def get_centroid_pheromone_vec(self, row: int, col: int) -> np.ndarray:
+        region_points = np.array(list(self.get_neighborhood(row, col, self.centroid_radius)))
+        region_pheremones = self.get_pheromone_vec(*region_points.T)
+        return np.mean(region_pheremones, axis=0)
+    
+    def get_neighborhood(self, row: int, col: int, radius: int, exclude_list: List[Tuple] = []) -> List[Tuple]:
+        exclude_set = set(exclude_list)
         region_set = set()
         outer_points = self.get_neighbors(row, col)
-        region_set.update(outer_points + [(row, col)])
 
-        for _ in range(self.centroid_radius):
+        region_set.update(outer_points)
+        if (row, col) not in exclude_set:
+            region_set.add((row, col))
+
+        for _ in range(radius - 1):
+            # convert outer points being considered to a numpy array and get all the possible neighbors
             np_outer = np.array(outer_points)
-            candidate_points = self.get_neighbors(*np_outer.T)
-            outer_points = [p for p in candidate_points if tuple(p) not in region_set]
+            candidate_points = reduce(lambda a, b: a + b, self.get_neighbors(*np_outer.T))
+            # filter candidate points to the new outer point set based on what hasn't been seen
+            outer_points = [p for p in candidate_points if tuple(p) not in region_set and tuple(p) not in exclude_set]
             region_set.update(outer_points)
-        region_points = np.array(list(region_set))
-        region_pheremones = self.get_pheremone_vec(*region_points.T)
-        return np.mean(region_pheremones, axis=[0, 1])
+        return list(region_set)
    
     def get_neighbors(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> Union[List[Tuple], np.ndarray]:
         return self.neighbors[row, col]
 
-    def evaporate_pheremones(self):
-        self.pheremones -= self.evap_factor * self.init_pheremones
+    def evaporate_pheromones(self):
+        self.pheromones = (self.evap_factor * self.pheromones) + ((1 - self.evap_factor) * self.init_pheromones)
