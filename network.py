@@ -6,7 +6,7 @@ from typing import List, Tuple, Union, Optional
 
 class LatticeNetwork():
     def __init__(self, network_shape: Tuple, embedding_dimension: int, evap_factor: float, 
-                 centroid_radius: int = 1, rng: Optional[Generator] = None):
+                 centroid_radius: int = 1, rng: Optional[Generator] = None, zeros: bool = False):
         # initialize centroid radius and evaporation factor
         self.centroid_radius = centroid_radius
         self.evap_factor = evap_factor
@@ -17,13 +17,17 @@ class LatticeNetwork():
         if type(embedding_dimension) != int:
             raise ValueError('embedding_dimension should be an int')
 
-        if rng is None:
+        if rng is None and not zeros:
             # initialize normally distributed pheromone vectors
             unnormalized_pheromones = np.random.randn(network_shape[0], network_shape[1], embedding_dimension)
-        else:
+            # normalize each node's pheromone vector to an L2-norm of 1 to project to spherical points
+            self.pheromones = unnormalized_pheromones / np.linalg.norm(unnormalized_pheromones, axis=-1, keepdims=True)
+        elif not zeros:
             unnormalized_pheromones = rng.normal(size=(network_shape[0], network_shape[1], embedding_dimension))
-        # normalize each node's pheromone vector to an L2-norm of 1 to project to spherical points
-        self.pheromones = unnormalized_pheromones / np.linalg.norm(unnormalized_pheromones, axis=-1, keepdims=True)
+            # normalize each node's pheromone vector to an L2-norm of 1 to project to spherical points
+            self.pheromones = unnormalized_pheromones / np.linalg.norm(unnormalized_pheromones, axis=-1, keepdims=True)
+        else:
+            self.pheromones = np.zeros((network_shape[0], network_shape[1], embedding_dimension))
         self.init_pheromones = np.copy(self.pheromones)
 
         # initialize 8-neighbor neighborhood adjacency list
