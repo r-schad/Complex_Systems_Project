@@ -67,9 +67,9 @@ class Ant:
 
 if __name__ == "__main__":
     network = LatticeNetwork((5, 5), 3, 0.99, rng=rng)
-    ant1 = Ant(np.array([1, 0, 0]), (0, 0), 1, 1, 1)
-    ant2 = Ant(np.array([0, 1, 0]), (2, 2), 1, 1, 1)
-    ant3 = Ant(np.array([0, 0, 1]), (4, 4), 1, 1, 1)
+    ant1 = Ant(np.array([1, 0, 0]), (0, 0), 1, 32, 0.2)
+    ant2 = Ant(np.array([0, 1, 0]), (2, 2), 1, 32, 0.2)
+    ant3 = Ant(np.array([0, 0, 1]), (4, 4), 1, 32, 0.2)
     status1, status2, status3 = False, False, False
 
     i = 0
