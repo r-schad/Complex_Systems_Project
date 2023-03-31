@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -65,33 +67,47 @@ class Ant:
         reinforce = self.get_update_reinforce(centroid_pheromone, node_pheromone)
         return node_pheromone + reinforce * (self.vec - node_pheromone)
 
+def parse_args():
+    args = argparse.ArgumentParser()
+    args.add_argument("-n", "--num-ants", type=int, default=5)
+    args.add_argument("-w", "--width", type=int, default=5)
+    args.add_argument("-b", "--beta", type=float, default=32)
+    args.add_argument("-d", "--delta", type=float, default=0.2)
+    args.add_argument("-e", "--embedding-dim", type=int, default=5)
+    args.add_argument("-v", "--evaporation-factor", type=float, default=0.99)
+    return args.parse_args()
+
 if __name__ == "__main__":
-    network = LatticeNetwork((5, 5), 3, 0.99, rng=rng)
-    ant1 = Ant(np.array([1, 0, 0]), (0, 0), 1, 32, 0.2)
-    ant2 = Ant(np.array([0, 1, 0]), (2, 2), 1, 32, 0.2)
-    ant3 = Ant(np.array([0, 0, 1]), (4, 4), 1, 32, 0.2)
-    status1, status2, status3 = False, False, False
+    args = parse_args()
+    network = LatticeNetwork((args.width, args.width), args.embedding_dim, 0.99, rng=rng)
+    existing_locs = set()
+    ants, status = [], []
+    for i in range(args.num_ants):
+        ant_vec = np.zeros(args.embedding_dim)
+        ant_vec[i] = 1
+        while True:
+            loc = tuple(rng.choice(np.arange(args.width), 2))
+            if loc not in existing_locs:
+                break
+        ants += [Ant(ant_vec, loc, 1, args.beta, args.delta)]
+        status += [False]
+
+    for i, s in enumerate(status):
+        print(f"Starting Status {i}: {status[i]}, Pos: {ants[i].pos}")
 
     i = 0
-    while not (status1 or status2 or status3) and i < 10000:
-        network.deposit_pheromone(ant1.vec, *ant1.pos)
-        network.deposit_pheromone(ant2.vec, *ant2.pos)
-        network.deposit_pheromone(ant3.vec, *ant3.pos)
-        ant1.decide_next_position(network, 0.5)
-        ant2.decide_next_position(network, 0.5)
-        ant3.decide_next_position(network, 0.5)
+    while not any(status) and i < 10000:
+        for ant in ants:
+            network.deposit_pheromone(ant.vec, *ant.pos)
+            ant.decide_next_position(network, 0.5)
         network.evaporate_pheromones()
         i += 1
 
-    diff1 = ant1.pheromone_weighting(np.linalg.norm(network.pheromones - ant1.vec, axis=-1))
-    diff2 = ant2.pheromone_weighting(np.linalg.norm(network.pheromones - ant2.vec, axis=-1))
-    diff3 = ant3.pheromone_weighting(np.linalg.norm(network.pheromones - ant3.vec, axis=-1))
-    print(f"Status 1: {status1}, Pos: {ant1.pos}")
-    print(f"Status 2: {status2}, Pos: {ant2.pos}")
-    print(f"Status 3: {status3}, Pos: {ant3.pos}")
+    diffs = [ant.pheromone_weighting(np.linalg.norm(network.pheromones - ant.vec, axis=-1)) for ant in ants]
+    for i, s in enumerate(status):
+        print(f"Status {i}: {status[i]}, Pos: {ants[i].pos}")
 
-    fig, ax = plt.subplots(3, 1) 
-    ax[0].imshow(diff1)
-    ax[1].imshow(diff2)
-    ax[2].imshow(diff3)
+    fig, ax = plt.subplots(args.num_ants, 1) 
+    for i, diff in enumerate(diffs):
+        ax[i].imshow(diff)
     plt.show()
