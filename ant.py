@@ -83,9 +83,9 @@ if __name__ == "__main__":
         network.evaporate_pheromones()
         i += 1
 
-    diff1 = np.linalg.norm(network.pheromones - ant1.vec, axis=-1)
-    diff2 = np.linalg.norm(network.pheromones - ant2.vec, axis=-1)
-    diff3 = np.linalg.norm(network.pheromones - ant3.vec, axis=-1)
+    diff1 = ant1.pheromone_weighting(np.linalg.norm(network.pheromones - ant1.vec, axis=-1))
+    diff2 = ant2.pheromone_weighting(np.linalg.norm(network.pheromones - ant2.vec, axis=-1))
+    diff3 = ant3.pheromone_weighting(np.linalg.norm(network.pheromones - ant3.vec, axis=-1))
     print(f"Status 1: {status1}, Pos: {ant1.pos}")
     print(f"Status 2: {status2}, Pos: {ant2.pos}")
     print(f"Status 3: {status3}, Pos: {ant3.pos}")
