@@ -1,11 +1,12 @@
 import numpy as np
+from numpy.random import Generator
 
 from functools import reduce
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 class LatticeNetwork():
     def __init__(self, network_shape: Tuple, embedding_dimension: int, evap_factor: float, 
-                 centroid_radius: int = 1):
+                 centroid_radius: int = 1, rng: Optional[Generator] = None):
         # initialize centroid radius and evaporation factor
         self.centroid_radius = centroid_radius
         self.evap_factor = evap_factor
@@ -16,8 +17,11 @@ class LatticeNetwork():
         if type(embedding_dimension) != int:
             raise ValueError('embedding_dimension should be an int')
 
-        # initialize normally distributed pheromone vectors
-        unnormalized_pheromones = np.random.randn(network_shape[0], network_shape[1], embedding_dimension)
+        if rng is None:
+            # initialize normally distributed pheromone vectors
+            unnormalized_pheromones = np.random.randn(network_shape[0], network_shape[1], embedding_dimension)
+        else:
+            unnormalized_pheromones = rng.normal(size=(network_shape[0], network_shape[1], embedding_dimension))
         # normalize each node's pheromone vector to an L2-norm of 1 to project to spherical points
         self.pheromones = unnormalized_pheromones / np.linalg.norm(unnormalized_pheromones, axis=-1, keepdims=True)
         self.init_pheromones = np.copy(self.pheromones)
@@ -92,6 +96,9 @@ class LatticeNetwork():
    
     def get_neighbors(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> Union[List[Tuple], np.ndarray]:
         return self.neighbors[row, col]
+
+    def deposit_pheromone(self, pheromone: np.ndarray, row: int, col: int):
+        self.pheromones[row, col] = pheromone
 
     def evaporate_pheromones(self):
         self.pheromones = (self.evap_factor * self.pheromones) + ((1 - self.evap_factor) * self.init_pheromones)
