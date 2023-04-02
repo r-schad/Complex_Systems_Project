@@ -35,38 +35,44 @@ class LatticeNetwork():
         for row in range(network_shape[0]):
             for col in range(network_shape[1]):
                 self.neighbors[row][col] = []
+                for a in range(-1, 2):
+                    for b in range(-1, 2):
+                        if a == 0 and b == 0:
+                            continue 
+                        self.neighbors[row, col] += [((row + a) % self.neighbors.shape[0], (col + b) % self.neighbors.shape[1])]
+                # self.neighbors[row]
 
-                if row != 0:
-                    north = (row - 1, col)
-                    self.neighbors[row][col].append(north)
+                # if row != 0:
+                #     north = (row - 1, col)
+                #     self.neighbors[row][col].append(north)
 
-                    if col != 0:
-                        northwest = (row - 1, col - 1)
-                        self.neighbors[row][col].append(northwest)
+                #     if col != 0:
+                #         northwest = (row - 1, col - 1)
+                #         self.neighbors[row][col].append(northwest)
 
-                    if col != network_shape[1] - 1:
-                        northeast = (row - 1, col + 1)
-                        self.neighbors[row][col].append(northeast)
+                #     if col != network_shape[1] - 1:
+                #         northeast = (row - 1, col + 1)
+                #         self.neighbors[row][col].append(northeast)
                 
-                if row != network_shape[0] - 1:
-                    south = (row + 1, col)
-                    self.neighbors[row][col].append(south)
+                # if row != network_shape[0] - 1:
+                #     south = (row + 1, col)
+                #     self.neighbors[row][col].append(south)
 
-                    if col != 0:
-                        southwest = (row + 1, col - 1)
-                        self.neighbors[row][col].append(southwest)
+                #     if col != 0:
+                #         southwest = (row + 1, col - 1)
+                #         self.neighbors[row][col].append(southwest)
 
-                    if col != network_shape[1] - 1:
-                        southeast = (row + 1, col + 1)
-                        self.neighbors[row][col].append(southeast)
+                #     if col != network_shape[1] - 1:
+                #         southeast = (row + 1, col + 1)
+                #         self.neighbors[row][col].append(southeast)
 
-                if col != 0:
-                    west = (row, col - 1)
-                    self.neighbors[row][col].append(west)
+                # if col != 0:
+                #     west = (row, col - 1)
+                #     self.neighbors[row][col].append(west)
 
-                if col != network_shape[1] - 1:
-                    east = (row, col + 1)
-                    self.neighbors[row][col].append(east)
+                # if col != network_shape[1] - 1:
+                #     east = (row, col + 1)
+                #     self.neighbors[row][col].append(east)
     
     def get_pheromone_vec(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> np.ndarray:
         return self.pheromones[row, col]

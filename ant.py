@@ -108,16 +108,16 @@ if __name__ == "__main__":
             if loc not in existing_locs:
                 existing_locs.add(loc)
                 break
-        ants += [Ant(ant_vec, loc, 1, args.beta, args.delta)]
+        ants += [(i, Ant(ant_vec, loc, 1, args.beta, args.delta))]
         status += [False]
 
     for i, s in enumerate(status):
-        print(f"Starting Status {i}: {status[i]}, Pos: {ants[i].pos}")
+        print(f"Starting Status {i}: {status[i]}, Pos: {ants[i][1].pos}")
 
     # run ACO self organization
     for i in tqdm(range(args.num_steps)):
         rng.shuffle(ants)
-        for j, ant in enumerate(ants):
+        for j, ant in ants:
             network.deposit_pheromone(ant.vec, *ant.pos)
             if not status[j] and (i / args.num_steps) > 0.02:
                 status[j] = ant.decide_next_position(network, 0.5)
@@ -128,9 +128,9 @@ if __name__ == "__main__":
             break
 
     for i, s in enumerate(status):
-        print(f"Status {i}: {status[i]}, Pos: {ants[i].pos}")
+        print(f"Status {i}: {status[i]}, Pos: {ants[i][1].pos}")
 
-    diffs = [ants[0].pheromone_weighting(np.linalg.norm(network.pheromones - vec, axis=-1)) for vec in vec_set]
+    diffs = [ants[0][1].pheromone_weighting(np.linalg.norm(network.pheromones - vec, axis=-1)) for vec in vec_set]
     fig, ax = plt.subplots(args.num_classes, 1) 
     for i, diff in enumerate(diffs):
         ax[i].imshow(diff)
