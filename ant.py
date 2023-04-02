@@ -95,7 +95,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    network = LatticeNetwork((args.width, args.width), args.embedding_dim, 0.99, 
+    network = LatticeNetwork((args.width, args.width), args.embedding_dim, args.evaporation_factor, 
                              rng=rng, centroid_radius=args.centroid_radius, zeros=args.zeros)
     existing_locs = set()
     ants, status = [], []
@@ -131,7 +131,7 @@ if __name__ == "__main__":
         print(f"Status {i}: {status[i]}, Pos: {ants[i][1].pos}")
 
     diffs = [ants[0][1].pheromone_weighting(np.linalg.norm(network.pheromones - vec, axis=-1)) for vec in vec_set]
-    fig, ax = plt.subplots(args.num_classes, 1) 
+    fig, ax = plt.subplots(1, args.num_classes) 
     for i, diff in enumerate(diffs):
         ax[i].imshow(diff)
     plt.show()
