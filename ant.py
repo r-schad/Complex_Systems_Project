@@ -13,7 +13,7 @@ rng = np.random.default_rng(seed=0)
 
 class Ant:
     def __init__(self, vec: np.ndarray, pos: tuple, alpha: float, beta: float, delta: float, 
-                 eps: float = 0.01, move_base: float = 2.0):
+                 eps: float = 0.01, move_base: float = 3.0):
         # initialize ant with the document vector
         self.vec = vec
         self.pos = pos
