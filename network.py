@@ -1,8 +1,10 @@
 import numpy as np
+
 from numpy.random import Generator
+from scipy.stats import norm
 
 from functools import reduce
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Callable
 
 class LatticeNetwork():
     def __init__(self, network_shape: Tuple, embedding_dimension: int, evap_factor: float, 
@@ -81,10 +83,10 @@ class LatticeNetwork():
     # tentative argument for not normalizing, bc the norm of a vector is indicative of the "strength" of a given topic
     # (eg. a "distracted" node will have a pheremone vector with a lower norm, which means even if it finds a match it's less likely to pick it)
     # This will result in distracted nodes being less likely to be traversed, with specialized nodes being picked instead
-    def get_centroid_pheromone_vec(self, row: int, col: int) -> np.ndarray:
-        region_points = np.array(list(self.get_neighborhood(row, col, self.centroid_radius)))
-        region_pheremones = self.get_pheromone_vec(*region_points.T)
-        return np.mean(region_pheremones, axis=0)
+    def get_centroid_pheromone_vec(self, row: int, col: int, exclude_list : List[Tuple] = []) -> np.ndarray:
+        region_points = np.array(list(self.get_neighborhood(row, col, self.centroid_radius, exclude_list=exclude_list)))
+        region_pheromones = self.get_pheromone_vec(*region_points.T)
+        return np.mean(region_pheromones, axis=0)
     
     def get_neighborhood(self, row: int, col: int, radius: int, exclude_list: List[Tuple] = []) -> List[Tuple]:
         exclude_set = set(exclude_list)
@@ -109,6 +111,19 @@ class LatticeNetwork():
 
     def deposit_pheromone(self, pheromone: np.ndarray, row: int, col: int):
         self.pheromones[row, col] = pheromone
+    
+    def deposit_pheromone_delta(self, pheromone_func: Callable[[np.ndarray, np.ndarray, float], np.ndarray], 
+                                neighborhood_func: Callable[[float], float],
+                                row: int, col: int):
+        neighbors = self.get_neighborhood(row, col, self.centroid_radius, [(row, col)])
+        centroid, node = self.get_centroid_pheromone_vec(row, col, [(row, col)]), self.get_pheromone_vec(row, col)
+        # TODO: figure out the scale to use
+        self.pheromones[row, col] = pheromone_func(centroid, node, neighborhood_func(0))
+        for r, c in neighbors:
+            centroid = self.get_centroid_pheromone_vec(r, c, [(row, col)])
+            node = self.get_pheromone_vec(r, c)
+            dist = float(np.sqrt((row - r) ** 2 + (col - c) ** 2))
+            self.pheromones[r, c] = pheromone_func(centroid, node, neighborhood_func(dist))
 
     def evaporate_pheromones(self):
         self.pheromones = (self.evap_factor * self.pheromones) + ((1 - self.evap_factor) * self.init_pheromones)
