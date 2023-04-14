@@ -3,6 +3,7 @@ import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 from network import LatticeNetwork
 from enum import Enum
@@ -13,7 +14,8 @@ from scipy.spatial.distance import cdist
 from ant import Ant
 from network import LatticeNetwork
 
-from store_visualize import load_embeds
+from store_visualize import load_embeds, balance_dataset_idx
+from model import load_model
 from search import load_query_data
 
 def parse_args():
@@ -28,21 +30,41 @@ def parse_args():
     args.add_argument("-r", "--centroid-radius", type=int, default=1)
     args.add_argument("-z", "--zeros", action='store_true')
     args.add_argument("-q", "--greedy-prob", type=float, default=0.2)
+    args.add_argument("-m", "--min-age", type=int, default=25)
+    args.add_argument("-e", "--export-video", action='store_true')
     return args.parse_args()
+
+def find_pheromone_map(ant, pheromones, vec):
+    diffs = np.zeros(pheromones.shape[:2])
+    for j, row in enumerate(pheromones):
+        for k, p in enumerate(row):
+            diffs[j, k] = ant.find_edge_pheromone(p, vec)
+    return diffs
 
 if __name__ == "__main__":
     rng = np.random.default_rng(seed=0)
     args = parse_args()
+    model = load_model("all-mpnet-base-v2")
 
-    categories, sentences, embeds = load_embeds(args.input_data)
-    e = embeds[:1000]
-    dists = cdist(e, e)
-    plt.imshow(dists)
-    plt.show()
+    if args.export_video:
+        sent = input("Input Query String: ")
+        enc = model.encode(sent)
+        fig = plt.figure()
+        frames = []
 
-    dots = 1 - (e @ e.T)
-    plt.imshow(dots)
-    plt.show()
+    categories, sentences, embeddings = load_embeds(args.input_data)
+    idxs = balance_dataset_idx(categories, 8 * args.num_ants, rng=rng)
+    # e = embeddings[idxs]
+    # dists = cdist(e, e)
+    # plt.imshow(dists)
+    # plt.show()
+
+    # dots = 1 - (e @ e.T)
+    # plt.imshow(dots)
+    # plt.show()
+
+    sents = sentences[idxs]
+    embeds = embeddings[idxs]
 
     network = LatticeNetwork((args.width, args.width), embeds.shape[-1], args.evaporation_factor, 
                              rng=rng, centroid_radius=args.centroid_radius, zeros=args.zeros)
@@ -52,51 +74,140 @@ if __name__ == "__main__":
     for i in range(args.num_ants):
         ant_vec = embeds[i]
         loc = tuple(rng.choice(np.arange(args.width), 2))
-        ants += [(i, Ant(ant_vec, loc, 1, args.beta, args.delta))]
+        ants += [(i, Ant(ant_vec, loc, 1, args.beta, args.delta, ant_id=i, document=sents[i]))]
         status += [False]
 
-    count = args.num_ants
+    ant_locs = []
+    count = 0 # args.num_ants
+    total_ages = []
     # run ACO self organization
     with tqdm(range(args.num_steps)) as t_iter:
         for i in t_iter:
             rng.shuffle(ants)
             sum_age = 0
             ages = []
-            for j, ant in ants:
+            for u, (j, ant) in enumerate(ants):
                 # new_pheromone = ant.get_new_pheromone_vec(network)
                 pheromone_update = ant.get_pheromone_update_func()
                 neighborhood_func = ant.get_neighborhood_func()
                 network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.pos)
                 s = ant.decide_next_position(network, args.greedy_prob)
-                if s and status[j]:
+                if s: # or ant.age > args.width:
                     loc = tuple(rng.choice(np.arange(args.width), 2))
-                    ants[j] = (j, Ant(embeds[count], loc, 1, args.beta, args.delta))
+                    vec = embeds[count]
+                    doc = sents[count]
+                    k = count
+                    count = (count + 1) % args.num_ants
+                    # a, b = ant.pos
+                    # ba, bb = ant.best_loc
+                    # network.neighbors[a, b] += [ant.best_loc]
+                    # network.neighbors[ba, bb] += [ant.pos]
+                    # if ant.best_loc is not None:
+                        # network.add_edge(ant.pos, ant.best_loc)
+                        # ant.pos = ant.best_loc
+                        # network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.best_loc)
+                    network.deposit_document(*ant.pos, ant.document)
+                    total_ages += [ant.age]
+                    ants[u] = (j, Ant(vec, loc, 1, args.beta, args.delta, ant_id=k, document=doc))
                     status[j] = False
                 else:
+                    # print(ant.best_pheromone)
                     status[j] = s
                 sum_age += ant.age
                 ages += [ant.age]
             network.evaporate_pheromones()
             norms = np.linalg.norm(network.pheromones, axis=-1)
-            best_matches = [ant.best_pheromone for j, ant in ants]
+            best_matches = [ant.best_pheromone for _, ant in ants]
             t_iter.set_postfix(avg_pheromone_norm=np.mean(norms), avg_age=np.mean(ages), min_age=np.min(ages), max_age=np.max(ages), 
-                               best_match=np.max(best_matches))
+                               best_match=np.max(best_matches), worst_match=np.min(best_matches), count=count)
+
+            if args.export_video:
+                map = find_pheromone_map(ant, network.pheromones, enc)
+                frames.append([plt.imshow(map, animated=True)])
             # t_iter.set_postfix(num_stopped=sum(status))
             # pct_stop = sum(status) / len(status)
             # if pct_stop > 0.9:
             #     break
-    plt.hist(ages, bins=np.ptp(ages)+1)
+
+    if args.export_video:
+        ani = animation.ArtistAnimation(fig, frames, interval=50, blit=True)
+        ani.save("animation.mp4")
+        plt.show()
+
+    total_ages += ages
+    plt.hist(total_ages, bins=np.ptp(total_ages)+1)
+    plt.title("Ant Age Histogram")
+    plt.show()
+
+    unique, counts = np.unique(total_ages, return_counts=True)
+    log_unique = np.log(unique[1:])
+    log_freqs = np.log(counts[1:] / np.sum(counts[1:]))
+    plt.plot(log_unique, log_freqs)
+    plt.title("Ant Age Rank Plot")
+    plt.show()
+
+    lens = [len(x) for x in network.neighbors.flatten()]
+    u, c = np.unique(lens, return_counts=True)
+    lu, lc = np.log(u), np.log(c / np.sum(c))
+    plt.loglog(u, c)
+    plt.title("Network Degree Rank Plot")
     plt.show()
 
     i = np.argmax(ages)
-    diffs = np.zeros(network.pheromones.shape[:2])
-    for j, row in enumerate(network.pheromones):
-        for k, p in enumerate(row):
-            diffs[j, k] = ants[i][1].pheromone_weighting(ants[i][1].dist(p, ants[i][1].vec))
-    # pheromone_list = network.pheromones.reshape(-1, network.pheromones.shape[-1])
-    # diff = ants[i][1].pheromone_weighting(ants[i][1].dist(pheromone_list, ants[i][1].vec))
-    # diff = ants[i][1].pheromone_weighting(np.linalg.norm(network.pheromones - ants[i][1].vec, axis=-1))
+    vec = ants[i][1].vec
+    diffs = find_pheromone_map(ants[i][1], network.pheromones, vec)
+    print(f"Sentence: {sents[ants[i][1].ant_id]}")
     plt.imshow(diffs)
     plt.show()
 
-    
+    sentence = input("Input Query String: ")
+    emb = model.encode(sentence)
+    diffs2 = find_pheromone_map(ants[i][1], network.pheromones, emb)
+
+    fig, ax = plt.subplots(1, 2)
+    ax[0].imshow(diffs)
+    ax[1].imshow(diffs2)
+    plt.show()
+
+    new_pos = tuple(rng.choice(np.arange(args.width), 2))
+    new_ant = Ant(emb, new_pos, 1, args.beta, args.delta, document=sentence)
+    start_match = new_ant.find_edge_pheromone(network.get_pheromone_vec(*new_ant.pos), new_ant.vec)
+    print(f"Start Position: {new_ant.pos}, Start Match: {start_match}")
+
+    pos_seq = []
+    pheromone_seq = []
+    prev_status = False
+    while True:
+        pos_seq += [new_ant.pos]
+        status = new_ant.decide_next_position(network, q=args.greedy_prob) #, search=True)
+        pheromone = new_ant.find_edge_pheromone(network.get_pheromone_vec(*new_ant.pos), new_ant.vec)
+        if pheromone < pheromone_seq[-1]:
+            status = True
+        pheromone_seq += [pheromone]
+        # print(status, pheromone / np.max(diffs[new_ant_class]))
+        # if pheromone > (0.6 * np.max(diffs[new_ant_class])) and status:
+        # stop if we get two consecutive stop signals
+        a, b = new_ant.pos
+        if status and prev_status:
+            print(network.get_documents(a, b))
+        if status and prev_status and len(network.documents[a, b]) != 0:
+            break
+        prev_status = status
+
+    print("Search Results: ")
+    a, b = new_ant.pos
+    docs = network.documents[a, b] # network.get_documents(*new_ant.pos)
+    for d in docs:
+        print(d)
+
+    final_match = new_ant.find_edge_pheromone(network.get_pheromone_vec(*new_ant.pos), new_ant.vec)
+    print(f"Path Length: {len(pos_seq)}")
+    print(f"Final Match: {final_match}")
+
+    path_map = np.zeros((args.width, args.width))
+    path_diff = find_pheromone_map(new_ant, network.pheromones, new_ant.vec)
+    for i, (r, c) in enumerate(pos_seq):
+        p = new_ant.find_edge_pheromone(network.pheromones[r, c], new_ant.vec)
+        path_map[r, c] = p / np.max(path_diff)
+    plt.imshow(path_map)
+    plt.show()

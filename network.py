@@ -32,11 +32,15 @@ class LatticeNetwork():
             self.pheromones = np.zeros((network_shape[0], network_shape[1], embedding_dimension))
         self.init_pheromones = np.copy(self.pheromones)
 
+        # initialize document list
+        self.documents = np.ndarray(network_shape, dtype=list)
+
         # initialize 8-neighbor neighborhood adjacency list
         self.neighbors = np.ndarray(network_shape, dtype=list)
         for row in range(network_shape[0]):
             for col in range(network_shape[1]):
-                self.neighbors[row][col] = []
+                self.neighbors[row, col] = []
+                self.documents[row, col] = []
                 for a in range(-1, 2):
                     for b in range(-1, 2):
                         if a == 0 and b == 0:
@@ -109,6 +113,14 @@ class LatticeNetwork():
     def get_neighbors(self, row: Union[int, np.ndarray], col: Union[int, np.ndarray]) -> Union[List[Tuple], np.ndarray]:
         return self.neighbors[row, col]
 
+    def add_edge(self, pos1: Tuple, pos2: Tuple):
+        a1, b1 = pos1
+        a2, b2 = pos2
+        if pos2 not in self.neighbors[a1, b1]:
+            self.neighbors[a1, b1] += [pos2]
+        if pos1 not in self.neighbors[a2, b2]:
+            self.neighbors[a2, b2] += [pos1]
+
     def deposit_pheromone(self, pheromone: np.ndarray, row: int, col: int):
         self.pheromones[row, col] = pheromone
     
@@ -127,3 +139,13 @@ class LatticeNetwork():
 
     def evaporate_pheromones(self):
         self.pheromones = (self.evap_factor * self.pheromones) + ((1 - self.evap_factor) * self.init_pheromones)
+
+    def deposit_document(self, row: int, col: int, document: str):
+        self.documents[row, col] += [document]
+
+    def get_documents(self, row: int, col: int, radius: int = 0) -> List[str]:
+        neighborhood = self.get_neighborhood(row, col, radius)
+        docs = []
+        for r, c in neighborhood:
+            docs += self.documents[r, c]
+        return docs
