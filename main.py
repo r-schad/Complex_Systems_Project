@@ -24,13 +24,14 @@ def parse_args():
     args.add_argument("-n", "--num-ants", type=int)
     args.add_argument("-b", "--beta", type=float, default=32)
     args.add_argument("-d", "--delta", type=float, default=0.2)
+    args.add_argument("-k", "--reinforce-exp", type=float, default=3)
     args.add_argument("-i", "--input-data", type=str)
     args.add_argument("-s", "--num-steps", type=int, default=200)
     args.add_argument("-v", "--evaporation-factor", type=float, default=0.995)
     args.add_argument("-r", "--centroid-radius", type=int, default=1)
     args.add_argument("-z", "--zeros", action='store_true')
     args.add_argument("-q", "--greedy-prob", type=float, default=0.2)
-    args.add_argument("-m", "--min-age", type=int, default=25)
+    args.add_argument("-m", "--warmup-steps", type=int, default=0)
     args.add_argument("-e", "--export-video", action='store_true')
     return args.parse_args()
 
@@ -74,7 +75,7 @@ if __name__ == "__main__":
     for i in range(args.num_ants):
         ant_vec = embeds[i]
         loc = tuple(rng.choice(np.arange(args.width), 2))
-        ants += [(i, Ant(ant_vec, loc, 1, args.beta, args.delta, ant_id=i, document=sents[i]))]
+        ants += [(i, Ant(ant_vec, loc, 1, args.beta, args.delta, reinforce_exp=args.reinforce_exp, ant_id=i, document=sents[i]))]
         status += [False]
 
     ant_locs = []
@@ -92,23 +93,19 @@ if __name__ == "__main__":
                 neighborhood_func = ant.get_neighborhood_func()
                 network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.pos)
                 s = ant.decide_next_position(network, args.greedy_prob)
-                if s: # or ant.age > args.width:
+                if s and status[j] and i > args.warmup_steps:
                     loc = tuple(rng.choice(np.arange(args.width), 2))
                     vec = embeds[count]
                     doc = sents[count]
                     k = count
                     count = (count + 1) % args.num_ants
-                    # a, b = ant.pos
-                    # ba, bb = ant.best_loc
-                    # network.neighbors[a, b] += [ant.best_loc]
-                    # network.neighbors[ba, bb] += [ant.pos]
-                    # if ant.best_loc is not None:
-                        # network.add_edge(ant.pos, ant.best_loc)
-                        # ant.pos = ant.best_loc
-                        # network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.best_loc)
-                    network.deposit_document(*ant.pos, ant.document)
+                    # if ant.best_loc is not None and ant.pos != ant.best_loc:
+                    #     network.add_edge(ant.pos, ant.best_loc)
+                    #     ant.pos = ant.best_loc
+                    #     network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.best_loc)
+                    network.deposit_document(*ant.pos, ant.document, ant.vec)
                     total_ages += [ant.age]
-                    ants[u] = (j, Ant(vec, loc, 1, args.beta, args.delta, ant_id=k, document=doc))
+                    ants[u] = (j, Ant(vec, loc, 1, args.beta, args.delta, reinforce_exp=args.reinforce_exp, ant_id=k, document=doc))
                     status[j] = False
                 else:
                     # print(ant.best_pheromone)
@@ -116,10 +113,12 @@ if __name__ == "__main__":
                 sum_age += ant.age
                 ages += [ant.age]
             network.evaporate_pheromones()
+            if i % 50 == 49:
+                network.erode_network()
             norms = np.linalg.norm(network.pheromones, axis=-1)
             best_matches = [ant.best_pheromone for _, ant in ants]
             t_iter.set_postfix(avg_pheromone_norm=np.mean(norms), avg_age=np.mean(ages), min_age=np.min(ages), max_age=np.max(ages), 
-                               best_match=np.max(best_matches), worst_match=np.min(best_matches), count=count)
+                               best_match=np.max(best_matches), avg_match=np.mean(best_matches), count=count)
 
             if args.export_video:
                 map = find_pheromone_map(ant, network.pheromones, enc)
@@ -147,6 +146,13 @@ if __name__ == "__main__":
     plt.show()
 
     lens = [len(x) for x in network.neighbors.flatten()]
+    u, c = np.unique(lens, return_counts=True)
+    lu, lc = np.log(u), np.log(c / np.sum(c))
+    plt.loglog(u, c)
+    plt.title("Network Degree Rank Plot")
+    plt.show()
+
+    lens = [len(x) for x in network.documents.flatten()]
     u, c = np.unique(lens, return_counts=True)
     lu, lc = np.log(u), np.log(c / np.sum(c))
     plt.loglog(u, c)
@@ -181,15 +187,13 @@ if __name__ == "__main__":
         pos_seq += [new_ant.pos]
         status = new_ant.decide_next_position(network, q=args.greedy_prob) #, search=True)
         pheromone = new_ant.find_edge_pheromone(network.get_pheromone_vec(*new_ant.pos), new_ant.vec)
-        if pheromone < pheromone_seq[-1]:
-            status = True
+        # if len(pheromone_seq) != 0 and pheromone < pheromone_seq[-1]:
+            # status = True
         pheromone_seq += [pheromone]
         # print(status, pheromone / np.max(diffs[new_ant_class]))
         # if pheromone > (0.6 * np.max(diffs[new_ant_class])) and status:
         # stop if we get two consecutive stop signals
         a, b = new_ant.pos
-        if status and prev_status:
-            print(network.get_documents(a, b))
         if status and prev_status and len(network.documents[a, b]) != 0:
             break
         prev_status = status

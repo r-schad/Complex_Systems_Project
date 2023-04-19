@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from network import LatticeNetwork
+from network import LatticeNetwork, euclidean_dist, ip_dist, inv_cos_dist
 from enum import Enum
 from tqdm import tqdm
 from typing import Tuple, Callable
@@ -13,19 +13,10 @@ rng = np.random.default_rng(seed=0)
 
 AntState = Enum('AntState', ['FOLLOW', 'RECOVER', 'STOPPED'])
 
-def euclidean_dist(a: np.ndarray, b: np.ndarray) -> float:
-    return np.linalg.norm(a - b)
-
-def inv_cos_dist(a: np.ndarray, b: np.ndarray, eps: float = 0.001) -> float:
-    a_norm, b_norm = np.linalg.norm(a, axis=0), np.linalg.norm(b, axis=0)
-    return (np.dot(a, b)) / ((a_norm * b_norm) + eps)
-
-def ip_dist(a: np.ndarray, b: np.ndarray, eps: float = 0.001) -> float:
-    return np.dot(a, b)
 
 class Ant:
     def __init__(self, vec: np.ndarray, pos: tuple, alpha: float, beta: float, delta: float, 
-                 eps: float = 0.01, move_base: float = 2.0, ant_id: int = None, document: str = None):
+                 eps: float = 0.01, reinforce_exp: float = 3.0, ant_id: int = None, document: str = None):
         # initialize ant with the document vector
         self.vec = vec
         self.pos = pos
@@ -36,7 +27,7 @@ class Ant:
         self.alpha = alpha
         self.beta = beta
         self.delta = delta
-        self.move_base = move_base
+        self.reinforce_exp = reinforce_exp
 
         # initialize ant state and memory
         self.state = AntState.FOLLOW
@@ -71,7 +62,9 @@ class Ant:
             inv_sgn = np.sign(prev_move[idx])
             prev_move[idx] = inv_sgn * (width - np.abs(prev_move[idx]))
 
-        return max(1 - (np.linalg.norm(curr_move - prev_move) / 8.0), 0.5)
+        
+
+        return max(1 - (np.linalg.norm(curr_move - prev_move) / np.sqrt(8.0)), 0.5)
 
     def decide_next_position(self, network: LatticeNetwork, q: float = 0.2, r: int = 1, search: bool = False) -> bool:
         # compute neighbors and corresponding pheromone levels
@@ -138,7 +131,7 @@ class Ant:
     def get_update_reinforce(self, centroid_pheromone: np.ndarray) -> float:
         # TODO: do we need to divide by the number of variables in the node pheromone if all our vectors are normalized?
         d = self.dist(centroid_pheromone, self.vec, self.eps) / 2.0
-        return self.alpha * (1 - d)
+        return self.alpha * ((1 - d) ** self.reinforce_exp)
 
     # update the pheromone vector for the specified node (equation (11) in Fernandes et al.)
     def get_new_pheromone_vec(self, network: LatticeNetwork) -> np.ndarray:

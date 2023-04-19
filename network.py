@@ -6,6 +6,16 @@ from scipy.stats import norm
 from functools import reduce
 from typing import List, Tuple, Union, Optional, Callable
 
+def euclidean_dist(a: np.ndarray, b: np.ndarray) -> float:
+    return np.linalg.norm(a - b)
+
+def inv_cos_dist(a: np.ndarray, b: np.ndarray, eps: float = 0.001) -> float:
+    a_norm, b_norm = np.linalg.norm(a, axis=0), np.linalg.norm(b, axis=0)
+    return 1 - ((np.dot(a, b)) / ((a_norm * b_norm) + eps))
+
+def ip_dist(a: np.ndarray, b: np.ndarray, eps: float = 0.001) -> float:
+    return 1 - np.dot(a, b)
+
 class LatticeNetwork():
     def __init__(self, network_shape: Tuple, embedding_dimension: int, evap_factor: float, 
                  centroid_radius: int = 1, rng: Optional[Generator] = None, zeros: bool = False):
@@ -34,6 +44,7 @@ class LatticeNetwork():
 
         # initialize document list
         self.documents = np.ndarray(network_shape, dtype=list)
+        self.doc_vecs = np.ndarray(network_shape, dtype=list)
 
         # initialize 8-neighbor neighborhood adjacency list
         self.neighbors = np.ndarray(network_shape, dtype=list)
@@ -41,6 +52,7 @@ class LatticeNetwork():
             for col in range(network_shape[1]):
                 self.neighbors[row, col] = []
                 self.documents[row, col] = []
+                self.doc_vecs[row, col] = []
                 for a in range(-1, 2):
                     for b in range(-1, 2):
                         if a == 0 and b == 0:
@@ -140,8 +152,21 @@ class LatticeNetwork():
     def evaporate_pheromones(self):
         self.pheromones = (self.evap_factor * self.pheromones) + ((1 - self.evap_factor) * self.init_pheromones)
 
-    def deposit_document(self, row: int, col: int, document: str):
+    def erode_network(self, dist_func: Callable = inv_cos_dist, min_dist: float = 1):
+        lens = np.array([[len(c) for c in r] for r in self.documents]) 
+        idxr, idxc = lens.nonzero()
+        for r, c in zip(idxr, idxc):
+            doc_list = self.documents[r, c]
+            vec_list = self.doc_vecs[r, c]
+            node_vec = self.get_pheromone_vec(r, c)
+
+            dists = [dist_func(v, node_vec) for v in vec_list]
+            self.documents[r, c] = [doc for i, doc in enumerate(doc_list) if dists[i] < min_dist]
+            self.doc_vecs[r, c] = [vec for i, vec in enumerate(vec_list) if dists[i] < min_dist]
+
+    def deposit_document(self, row: int, col: int, document: str, vec: np.ndarray):
         self.documents[row, col] += [document]
+        self.doc_vecs[row, col] += [vec]
 
     def get_documents(self, row: int, col: int, radius: int = 0) -> List[str]:
         neighborhood = self.get_neighborhood(row, col, radius)
