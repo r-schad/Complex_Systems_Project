@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 
 from numpy.random import Generator
@@ -174,3 +176,16 @@ class LatticeNetwork():
         for r, c in neighborhood:
             docs += self.documents[r, c]
         return docs
+
+    def to_pickle(self, out_path: str):
+        with open(out_path, 'wb') as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def from_pickle(in_path: str):
+        with open(in_path, 'rb') as f:
+            d = pickle.load(f)
+        if not isinstance(d, LatticeNetwork):
+            raise ValueError(f"unrecognized datatype: {type(d)}")
+        return d
+        

@@ -283,3 +283,10 @@ if __name__ == "__main__":
         path_map[r, c] = p / np.max(path_diff)
     plt.imshow(path_map)
     plt.show()
+
+    out_path = input("Input Output Path: ")
+    try:
+        network.to_pickle(out_path)
+        n = LatticeNetwork.from_pickle(out_path)
+    except Exception as e:
+        print(f"failed to save network state to pickle: {str(e)}")
