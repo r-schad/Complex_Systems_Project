@@ -66,6 +66,9 @@ class Ant:
 
         return max(1 - (np.linalg.norm(curr_move - prev_move) / np.sqrt(8.0)), 0.5)
 
+    def calc_stop_threshold(self):
+        return np.exp(-0.00893 * self.age) * self.best_pheromone 
+
     def decide_next_position(self, network: LatticeNetwork, q: float = 0.2, r: int = 1, search: bool = False) -> bool:
         # compute neighbors and corresponding pheromone levels
         neighbors = network.get_neighborhood(*self.pos, radius=r, exclude_list=[self.pos])
@@ -80,9 +83,9 @@ class Ant:
         current_pheromone = self.find_edge_pheromone(cent, self.vec)
 
         # enforce that pheromones consistently get better
-        pheromones = [p if p >= current_pheromone else 0 for p in pheromones]
+        # pheromones = [p if p >= current_pheromone else 0 for p in pheromones]
 
-        # compute the pheremone scalars for the change in directions
+        # compute the phermone scalars for the change in directions
         if not search:
             move_diffs = [self.get_move_diff(n, network.pheromones.shape[0]) for n in neighbors]
             pheromones = [move_diffs[i] * p for i, p in enumerate(pheromones)]
@@ -95,7 +98,7 @@ class Ant:
         if rng.uniform() < q:
             # take the greedy option with probability q
             i = np.argmax(pheromones)
-            if pheromones[i] < current_pheromone:
+            if current_pheromone > pheromones[i]:
                 stopped = True
         else:
             sum = np.sum(pheromones)
@@ -105,6 +108,10 @@ class Ant:
             else:
                 probs = np.array(pheromones) / np.sum(pheromones)
             i = int(self.roulette_wheel(probs))
+
+        if current_pheromone > self.calc_stop_threshold() and rng.uniform() > (pheromones[i] / np.sum(pheromones)):
+            stopped = True
+
         if not stopped or search:
             new_pos = neighbors[i]
             # TODO: Implement previous move tracking

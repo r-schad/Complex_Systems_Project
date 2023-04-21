@@ -20,12 +20,12 @@ from search import load_query_data
 
 def parse_args():
     args = argparse.ArgumentParser()
-    args.add_argument("-w", "--width", type=int)
-    args.add_argument("-n", "--num-ants", type=int)
+    args.add_argument("-w", "--width", type=int, default=100)
+    args.add_argument("-n", "--num-ants", type=int, default=1000)
     args.add_argument("-b", "--beta", type=float, default=32)
     args.add_argument("-d", "--delta", type=float, default=0.2)
     args.add_argument("-k", "--reinforce-exp", type=float, default=3)
-    args.add_argument("-i", "--input-data", type=str)
+    args.add_argument("-i", "--input-data", type=str, default='test_embed.pkl')
     args.add_argument("-s", "--num-steps", type=int, default=200)
     args.add_argument("-v", "--evaporation-factor", type=float, default=0.995)
     args.add_argument("-r", "--centroid-radius", type=int, default=1)
@@ -61,7 +61,7 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
                 neighborhood_func = ant.get_neighborhood_func()
                 network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.pos)
                 s = ant.decide_next_position(network, q=q)
-                if s and status[j] and i > warmup_steps:
+                if s and ant.age > warmup_steps:
                     loc = tuple(rng.choice(np.arange(network.documents.shape[0]), 2))
                     vec = embeds[count]
                     doc = sents[count]
@@ -121,7 +121,7 @@ def ant_search(network: LatticeNetwork, ant: Ant, q: float, max_steps: Optional[
         # if pheromone > (0.6 * np.max(diffs[new_ant_class])) and status:
         # stop if we get two consecutive stop signals
         a, b = ant.pos
-        if status and prev_status and len(network.documents[a, b]) != 0:
+        if status and len(network.documents[a, b]) != 0:
             return ant, network.documents[a, b], pos_seq, pheromone_seq
         prev_status = status
         i += 1
