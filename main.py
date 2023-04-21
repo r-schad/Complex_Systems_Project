@@ -60,8 +60,9 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
                 pheromone_update = ant.get_pheromone_update_func()
                 neighborhood_func = ant.get_neighborhood_func()
                 network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.pos)
-                s = ant.decide_next_position(network, q=q)
-                if s and ant.age > warmup_steps:
+                warmup = ant.age <= warmup_steps
+                s = ant.decide_next_position(network, q=q, warmup=warmup)
+                if s and not warmup:
                     loc = tuple(rng.choice(np.arange(network.documents.shape[0]), 2))
                     vec = embeds[count]
                     doc = sents[count]
@@ -81,9 +82,9 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
                 ages += [ant.age]
             network.evaporate_pheromones()
             if i % 50 == 49:
-                network.erode_network()
+                network.erode_network(min_dist=0.8)
             norms = np.linalg.norm(network.pheromones, axis=-1)
-            best_matches = [ant.best_pheromone for _, ant in ants]
+            best_matches = [ant.current_pheromone for _, ant in ants]
             t_iter.set_postfix(avg_pheromone_norm=np.mean(norms), avg_age=np.mean(ages), min_age=np.min(ages), max_age=np.max(ages), 
                                best_match=np.max(best_matches), avg_match=np.mean(best_matches), count=count)
             if visualize:
@@ -92,7 +93,6 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
     if visualize:
         return network, ants, ages, total_ages, frames 
     return network, ants, ages, total_ages
-    
 
 def init_ant(network: LatticeNetwork, vec: np.ndarray, beta: float, delta: float, doc: str = "", verbose: bool = False) -> Ant:
     new_pos = tuple(rng.choice(np.arange(network.documents.shape[0]), 2))
@@ -112,7 +112,7 @@ def ant_search(network: LatticeNetwork, ant: Ant, q: float, max_steps: Optional[
         if max_steps is not None and i > max_steps:
             return None
         pos_seq += [ant.pos]
-        status = ant.decide_next_position(network, q=q) #, search=True)
+        status = ant.decide_next_position(network, q=q, search=True)
         pheromone = ant.find_edge_pheromone(network.get_pheromone_vec(*ant.pos), ant.vec)
         # if len(pheromone_seq) != 0 and pheromone < pheromone_seq[-1]:
             # status = True
