@@ -32,6 +32,7 @@ class Ant:
         # initialize ant state and memory
         self.state = AntState.FOLLOW
         self.best_pheromone = 0
+        self.current_pheromone = 0
         self.best_loc = None
         self.age = 0
 
@@ -62,14 +63,15 @@ class Ant:
             inv_sgn = np.sign(prev_move[idx])
             prev_move[idx] = inv_sgn * (width - np.abs(prev_move[idx]))
 
-        
-
         return max(1 - (np.linalg.norm(curr_move - prev_move) / np.sqrt(8.0)), 0.5)
 
     def calc_stop_threshold(self):
+        if self.best_pheromone == 0:
+            return self.pheromone_weighting(0.8)
         return np.exp(-0.00893 * self.age) * self.best_pheromone 
 
-    def decide_next_position(self, network: LatticeNetwork, q: float = 0.2, r: int = 1, search: bool = False) -> bool:
+    def decide_next_position(self, network: LatticeNetwork, q: float = 0.2, r: int = 1, 
+                             warmup: bool = False, search: bool = False) -> bool:
         # compute neighbors and corresponding pheromone levels
         neighbors = network.get_neighborhood(*self.pos, radius=r, exclude_list=[self.pos])
         centroid_vecs = [network.get_centroid_pheromone_vec(r, c, [self.pos]) for r, c in neighbors]
@@ -80,39 +82,43 @@ class Ant:
         # compute current node pheromones
         cent = network.get_centroid_pheromone_vec(*self.pos)
         pher = network.get_pheromone_vec(*self.pos)
-        current_pheromone = self.find_edge_pheromone(cent, self.vec)
+        self.current_pheromone = self.find_edge_pheromone(cent, self.vec)
 
-        # enforce that pheromones consistently get better
-        # pheromones = [p if p >= current_pheromone else 0 for p in pheromones]
+        # enforce that pheromones consistently get better if there is room to improve
+        if search and any([p >= self.current_pheromone for p in pheromones]):
+            pheromones = [p if p >= self.current_pheromone else 0 for p in pheromones]
 
         # compute the phermone scalars for the change in directions
-        if not search:
-            move_diffs = [self.get_move_diff(n, network.pheromones.shape[0]) for n in neighbors]
-            pheromones = [move_diffs[i] * p for i, p in enumerate(pheromones)]
+        move_diffs = [self.get_move_diff(n, network.pheromones.shape[0]) for n in neighbors]
+        pheromones = [move_diffs[i] * p for i, p in enumerate(pheromones)]
 
-        if current_pheromone > self.best_pheromone:
-            self.best_pheromone = current_pheromone
+        if self.current_pheromone > self.best_pheromone:
+            self.best_pheromone = self.current_pheromone
             self.best_loc = self.pos
+
+        # sum = np.sum(pheromones)
+        # # TODO: Figure out if stochastic stop is necessary
+        # if sum == 0:
+        #     probs = np.ones(len(pheromones)) / len(pheromones)
+        # else:
+        #     probs = np.array(pheromones) / np.sum(pheromones)
+
+        probs = np.array(pheromones) / np.sum(pheromones)
         
         stopped = False
         if rng.uniform() < q:
             # take the greedy option with probability q
             i = np.argmax(pheromones)
-            if current_pheromone > pheromones[i]:
+            if self.current_pheromone > pheromones[i]:
                 stopped = True
         else:
-            sum = np.sum(pheromones)
-            # TODO: Figure out if stochastic stop is necessary
-            if sum == 0:
-                probs = np.ones(len(pheromones)) / len(pheromones)
-            else:
-                probs = np.array(pheromones) / np.sum(pheromones)
+            
             i = int(self.roulette_wheel(probs))
 
-        if current_pheromone > self.calc_stop_threshold() and rng.uniform() > (pheromones[i] / np.sum(pheromones)):
+        if self.current_pheromone > self.calc_stop_threshold() and rng.uniform() > probs[i]:
             stopped = True
 
-        if not stopped or search:
+        if not stopped or warmup:
             new_pos = neighbors[i]
             # TODO: Implement previous move tracking
             self.prev_pos = self.pos
