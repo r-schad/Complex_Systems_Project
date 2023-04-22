@@ -135,6 +135,7 @@ if __name__ == '__main__':
     b_maxs = np.array(baseline_maxs)
 
     print(f"Average Baseline Upper-Bound: {np.mean(b_maxs[b_idx])}")
+    print(f"Average Baseline Lower-Bound: {np.mean(b_mins[b_idx])}")
 
     axs[0].scatter(b_idx, b_means[b_idx], c='r', label='baseline_means')
     axs[0].scatter(b_idx, b_mins[b_idx], c='m', label='baseline_mins')
@@ -148,6 +149,7 @@ if __name__ == '__main__':
     a_maxs = np.array(acses_maxs)
 
     print(f"Average ACSeS Upper-Bound: {np.mean(a_maxs[a_idx])}")
+    print(f"Average ACSeS Lower-Bound: {np.mean(a_mins[a_idx])}")
 
     axs[1].scatter(a_idx, a_means[a_idx], c='b', label='acses_means')
     axs[1].scatter(a_idx, a_mins[a_idx], c='c', label='acses_mins')
