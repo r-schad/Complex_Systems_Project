@@ -27,9 +27,9 @@ if __name__ == "__main__":
         print("Search Results:")
         for d in docs:
             print(d)
-        path_map = np.zeros((network.pheromones.shape[0], network.pheromones.shape[1]))
+        path_map = np.zeros((network.pheromones.shape[0], network.pheromones.shape[1]), dtype=float)
         for i, (a, b) in enumerate(pos_seq):
-            path_map[a, b] = (pher_seq[i] / np.max(pher_seq[i]))
+            path_map[a, b] = (pher_seq[i] / np.max(pher_seq))
         print(f"Ant Walk Length: {len(pos_seq)}")
         plt.imshow(path_map)
         plt.title("Ant Path Colored by Pheromone Match")
