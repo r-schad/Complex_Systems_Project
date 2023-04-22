@@ -61,7 +61,7 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
                 neighborhood_func = ant.get_neighborhood_func()
                 network.deposit_pheromone_delta(pheromone_update, neighborhood_func, *ant.pos)
                 warmup = ant.age <= warmup_steps
-                s = ant.decide_next_position(network, q=q, warmup=warmup)
+                s = ant.decide_next_position(network, q=q, warmup=warmup, search=True)
                 if s and not warmup:
                     loc = tuple(rng.choice(np.arange(network.documents.shape[0]), 2))
                     vec = embeds[count]
@@ -82,7 +82,7 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
                 ages += [ant.age]
             network.evaporate_pheromones()
             if i % 50 == 49:
-                network.erode_network(min_dist=0.8)
+                network.erode_network(min_dist=0.6)
             norms = np.linalg.norm(network.pheromones, axis=-1)
             best_matches = [ant.current_pheromone for _, ant in ants]
             t_iter.set_postfix(avg_pheromone_norm=np.mean(norms), avg_age=np.mean(ages), min_age=np.min(ages), max_age=np.max(ages), 

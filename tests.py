@@ -20,7 +20,7 @@ def parse_args():
     args.add_argument("-r", "--centroid-radius", type=int, default=1)
     args.add_argument("-z", "--zeros", action='store_true')
     args.add_argument("-q", "--greedy-prob", type=float, default=0.2)
-    args.add_argument("-m", "--warmup-steps", type=int, default=0)
+    args.add_argument("-m", "--warmup-steps", type=int, default=50)
     args.add_argument("-e", "--export-video", action='store_true')
     return args.parse_args()
 
@@ -29,7 +29,8 @@ if __name__ == '__main__':
     args = parse_args()
 
     # import network and its documents from pkl
-    acses_network = LatticeNetwork.from_pickle('final_network.pkl')
+    path = input("Input Network Path: ")
+    acses_network = LatticeNetwork.from_pickle(path)
     all_docs = np.vstack(reduce(lambda a,b: a+b, acses_network.documents.flatten())).flatten()
     all_doc_vecs = reduce(lambda a,b: a+b, acses_network.doc_vecs.flatten())
 
@@ -60,70 +61,101 @@ if __name__ == '__main__':
     acses_means = []
     acses_mins = []
     acses_maxs = []
+    acses_matches = []
     # sample N documents and compare ACSeS vs random allocation 
     while len(doc_idxs) < args.num_ants:
         # get a random document index
         doc_idx = np.random.randint(low=0, high=all_docs.shape[0])
-
-        # using baseline (random allocation)
-
-        # get a random node from the 100x100 grid
-        baseline_node_idx = np.random.randint(low=0, high=args.width, size=2)
-        # if that node doesn't have any documents, skip this document
-        if len(basic_network_docs[baseline_node_idx[0], baseline_node_idx[1]]) == 0: continue
-
         doc_idxs += [doc_idx]
 
-        # get the document and vectors stored in the randomly selected node
-        baseline_docs = basic_network_docs[baseline_node_idx[0], baseline_node_idx[1]]
-        baseline_vecs = basic_network_vecs[baseline_node_idx[0], baseline_node_idx[1]]
+        # using ACSeS
+        # initialize ant
+        ant_vec = all_doc_vecs[doc_idx]
+        loc = tuple(rng.choice(np.arange(args.width), 2))
+        ant = Ant(ant_vec, loc, 1, args.beta, args.delta, reinforce_exp=args.reinforce_exp, ant_id=i, document=all_docs[doc_idx])
 
-        # calculate the inverse cosine distance of the current doc with all docs in the randomly selected node
-        baseline_dists = [inv_cos_dist(all_doc_vecs[doc_idx], vec) for vec in baseline_vecs]
-        if baseline_dists == []: baseline_dists = [2.0]
+        data = ant_search(acses_network, ant, q=args.greedy_prob, max_steps=200)
+        if data is not None:
+            ant, acses_docs, pos_seq, pher_seq = data
+            # get the vectors stored in the ACSeS-selected node
+            acses_node_idx = pos_seq[-1]
+            acses_vecs = acses_network.doc_vecs[acses_node_idx[0]][acses_node_idx[1]]
+
+            # calculate the inverse cosine distance of the current doc with all docs in the randomly selected node
+            acses_dists = [inv_cos_dist(all_doc_vecs[doc_idx], vec) for vec in acses_vecs]
+            acses_matches += [ant.current_pheromone]
+            l = len(pos_seq)
+        else:
+            acses_dists = [2.0]
+            l = 200
+
+        # store acses stats
+        acses_means += [np.mean(acses_dists)]
+        acses_mins += [np.min(acses_dists)]
+        acses_maxs += [np.max(acses_dists)]
+
+        # baseline inference
+        tried_set = set()
+        while len(tried_set) < l:
+            baseline_node_idx = np.random.randint(low=0, high=args.width, size=2)
+            if tuple(baseline_node_idx) in tried_set:
+                continue
+            tried_set.add(tuple(baseline_node_idx))
+
+            # get the document and vectors stored in the randomly selected node
+            baseline_docs = basic_network_docs[baseline_node_idx[0], baseline_node_idx[1]]
+            baseline_vecs = basic_network_vecs[baseline_node_idx[0], baseline_node_idx[1]]
+
+            # calculate the inverse cosine distance of the current doc with all docs in the randomly selected node
+            baseline_dists = [inv_cos_dist(all_doc_vecs[doc_idx], vec) for vec in baseline_vecs]
+            if len(baseline_dists) != 0:
+                break
+            # baseline_dists = [2.0]
+        if len(baseline_dists) == 0:
+            baseline_dists = [2.0]
 
         # store baseline stats
         baseline_means += [np.mean(baseline_dists)]
         baseline_mins += [np.min(baseline_dists)]
         baseline_maxs += [np.max(baseline_dists)]
 
-        # using ACSeS
 
-        # initialize ant
-        ant_vec = all_doc_vecs[doc_idx]
-        loc = tuple(rng.choice(np.arange(args.width), 2))
-        ant = Ant(ant_vec, loc, 1, args.beta, args.delta, reinforce_exp=args.reinforce_exp, ant_id=i, document=all_docs[doc_idx])
+    acses_eff = len([a for a in acses_mins if a == 2.0]) / len(acses_mins)
+    baseline_eff = len([b for b in baseline_mins if b == 2.0]) / len(baseline_mins)
 
-        ant, acses_docs, pos_seq, pher_seq = ant_search(acses_network, ant, q=args.greedy_prob)
-
-        # get the vectors stored in the ACSeS-selected node
-        acses_node_idx = pos_seq[-1]
-        acses_vecs = acses_network.doc_vecs[acses_node_idx[0]][acses_node_idx[1]]
-
-        # calculate the inverse cosine distance of the current doc with all docs in the randomly selected node
-        acses_dists = [inv_cos_dist(all_doc_vecs[doc_idx], vec) for vec in acses_vecs]
-
-        # store acses stats
-        acses_means += [np.mean(acses_dists)]
-        acses_mins += [np.min(acses_dists)]
-        acses_maxs += [np.max(acses_dists)]
+    print(f"ACSeS Search Failure Rate: {acses_eff}")
+    print(f"Baseline Search Failure Rate: {baseline_eff}")
    
     f,axs = plt.subplots(2)
 
-    axs[0].scatter(range(len(doc_idxs)), baseline_means, c='r', label='baseline_means')
-    axs[0].scatter(range(len(doc_idxs)), baseline_mins, c='m', label='baseline_mins')
-    axs[0].scatter(range(len(doc_idxs)), baseline_maxs, c='y', label='baseline_maxs')
+    b_idx = [i for i, b in enumerate(baseline_mins) if b != 2.0]
+
+    b_mins = np.array(baseline_mins)
+    b_means = np.array(baseline_means)
+    b_maxs = np.array(baseline_maxs)
+
+    print(f"Average Baseline Upper-Bound: {np.mean(b_maxs[b_idx])}")
+
+    axs[0].scatter(b_idx, b_means[b_idx], c='r', label='baseline_means')
+    axs[0].scatter(b_idx, b_mins[b_idx], c='m', label='baseline_mins')
+    axs[0].scatter(b_idx, b_maxs[b_idx], c='y', label='baseline_maxs')
     axs[0].legend()
 
-    axs[1].scatter(range(len(doc_idxs)), acses_means, c='b', label='acses_means')
-    axs[1].scatter(range(len(doc_idxs)), acses_mins, c='c', label='acses_mins')
-    axs[1].scatter(range(len(doc_idxs)), acses_maxs, c='g', label='acses_maxs')
+    a_idx = [i for i, a in enumerate(acses_mins) if a != 2.0]
+
+    a_mins = np.array(acses_mins)
+    a_means = np.array(acses_means)
+    a_maxs = np.array(acses_maxs)
+
+    print(f"Average ACSeS Upper-Bound: {np.mean(a_maxs[a_idx])}")
+
+    axs[1].scatter(a_idx, a_means[a_idx], c='b', label='acses_means')
+    axs[1].scatter(a_idx, a_mins[a_idx], c='c', label='acses_mins')
+    axs[1].scatter(a_idx, a_maxs[a_idx], c='g', label='acses_maxs')
 
     axs[1].legend()
 
     plt.show()
-    pass
-
 
     
     
