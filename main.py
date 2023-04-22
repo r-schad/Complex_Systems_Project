@@ -82,7 +82,7 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
                 ages += [ant.age]
             network.evaporate_pheromones()
             if i % 50 == 49:
-                network.erode_network(min_dist=0.6)
+                network.erode_network(min_dist=0.7)
             norms = np.linalg.norm(network.pheromones, axis=-1)
             best_matches = [ant.current_pheromone for _, ant in ants]
             t_iter.set_postfix(avg_pheromone_norm=np.mean(norms), avg_age=np.mean(ages), min_age=np.min(ages), max_age=np.max(ages), 
@@ -94,7 +94,9 @@ def organize_network(network: LatticeNetwork, ants: List[Tuple[int, Ant]], embed
         return network, ants, ages, total_ages, frames 
     return network, ants, ages, total_ages
 
-def init_ant(network: LatticeNetwork, vec: np.ndarray, beta: float, delta: float, doc: str = "", verbose: bool = False) -> Ant:
+def init_ant(network: LatticeNetwork, vec: np.ndarray, beta: float, delta: float, doc: str = "", verbose: bool = False, rng = None) -> Ant:
+    if rng is None:
+        rng = np.random
     new_pos = tuple(rng.choice(np.arange(network.documents.shape[0]), 2))
     new_ant = Ant(vec, new_pos, 1, beta, delta, document=doc)
     start_match = new_ant.find_edge_pheromone(network.get_pheromone_vec(*new_ant.pos), new_ant.vec)
