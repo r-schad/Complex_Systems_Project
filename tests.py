@@ -126,7 +126,7 @@ if __name__ == '__main__':
     print(f"ACSeS Search Failure Rate: {acses_eff}")
     print(f"Baseline Search Failure Rate: {baseline_eff}")
    
-    f,axs = plt.subplots(2)
+    f,axs = plt.subplots(3, sharey=True)
 
     b_idx = [i for i, b in enumerate(baseline_mins) if b != 2.0]
 
@@ -137,10 +137,9 @@ if __name__ == '__main__':
     print(f"Average Baseline Upper-Bound: {np.mean(b_maxs[b_idx])}")
     print(f"Average Baseline Lower-Bound: {np.mean(b_mins[b_idx])}")
 
-    axs[0].scatter(b_idx, b_means[b_idx], c='r', label='baseline_means')
-    axs[0].scatter(b_idx, b_mins[b_idx], c='m', label='baseline_mins')
-    axs[0].scatter(b_idx, b_maxs[b_idx], c='y', label='baseline_maxs')
-    axs[0].legend()
+    axs[0].scatter(b_idx, b_mins[b_idx], label='Min Distance: Baseline')
+    axs[1].scatter(b_idx, b_maxs[b_idx], label='Max Distance: Baseline')
+    axs[2].scatter(b_idx, b_means[b_idx], label='Mean Distance: Baseline')
 
     a_idx = [i for i, a in enumerate(acses_mins) if a != 2.0]
 
@@ -151,11 +150,22 @@ if __name__ == '__main__':
     print(f"Average ACSeS Upper-Bound: {np.mean(a_maxs[a_idx])}")
     print(f"Average ACSeS Lower-Bound: {np.mean(a_mins[a_idx])}")
 
-    axs[1].scatter(a_idx, a_means[a_idx], c='b', label='acses_means')
-    axs[1].scatter(a_idx, a_mins[a_idx], c='c', label='acses_mins')
-    axs[1].scatter(a_idx, a_maxs[a_idx], c='g', label='acses_maxs')
+    axs[0].scatter(a_idx, a_mins[a_idx], label='Min Distance: ACSeS')
+    axs[1].scatter(a_idx, a_maxs[a_idx], label='Max Distance: ACSeS')
+    axs[2].scatter(a_idx, a_means[a_idx], label='Mean Distance: ACSeS')
 
+    axs[0].legend()
+    axs[0].set_xticks([])
+    # axs[0].set_title('Minimum Inverse Cosine Distance between Query and Retrieved Documents')
     axs[1].legend()
+    axs[1].set_xticks([])
+    axs[1].set_ylabel('Inverse Cosine Distance')
+    # axs[1].set_title('Maximum Inverse Cosine Distance between Query and Retrieved Documents')
+    axs[2].legend()
+    axs[2].set_xticks([])
+    # axs[2].set_title('Mean Inverse Cosine Distance between Query and Retrieved Documents')
+
+    plt.suptitle('Inverse Cosine Distance Between Query and Retrieved Documents')
 
     plt.show()
 
